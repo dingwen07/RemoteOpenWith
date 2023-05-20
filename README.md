@@ -1,2 +1,2 @@
 # RemoteOpenWith
-Open files directly from your PC when clicking in Remote PC
+Open directly from your PC when clicking files in Remote PC
