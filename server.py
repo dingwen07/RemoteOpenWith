@@ -9,6 +9,8 @@ SERVER_IP_V6 = "::"
 SERVER_PORT = 2335
 BUFFER_SIZE = 1024
 FILE_FOLDER = './files'
+PASSWORD_AUTH = False
+PASSWORD = 'VerySecurePassword'
 
 def create_response_socket(ip_version):
     if ip_version == 4:
@@ -35,7 +37,19 @@ def handle_client(conn, addr):
     # Step 2: Verify
     conn.sendall(b'VERIFY\r\n')
     data = conn.recv(BUFFER_SIZE)
-    print("Received verification: ", data.decode())
+    data = data.decode().strip()
+    print("Received verification: ", data)
+    if data != PASSWORD:
+        if PASSWORD_AUTH:
+            conn.sendall(b'ERROR\r\n')
+            conn.close()
+            print("Password incorrect. Connection closed.")
+            return
+        else:
+            # do port verification
+            ports = data.split(',')
+            print("Ports: ", ports)
+            
     conn.sendall(b'OK\r\n')
 
     # Step 3: Receive file
@@ -57,6 +71,12 @@ def handle_client(conn, addr):
     request_id, filename, file_size, file_hash = file_metadata
     file_size = int(file_size)
     print(f"Received file metadata: request_id={request_id}, filename={filename}, file_size={file_size}, file_hash={file_hash}")
+    # check if `./files/request_id` exists, if so, duplicate request, reject
+    if os.path.exists(os.path.join(FILE_FOLDER, request_id)):
+        print(f"Duplicate request: {request_id}, reject.")
+        conn.sendall(b'ERROR: Duplicate request\r\n')
+        conn.close()
+        return
     conn.sendall(b'OK\r\n')
 
     folder_path = os.path.join(FILE_FOLDER, request_id)

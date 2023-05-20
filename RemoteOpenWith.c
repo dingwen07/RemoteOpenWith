@@ -6,17 +6,17 @@
 #include <windows.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <time.h>
 
 #include "GetTCPConnections.h"
 #include "HashFile.h"
 
 #define SERVER_PORT 2335
 #define MAX_BUFFER_LEN 4096
-#define NUM_PORTS 10
-#define MAX_REQUEST_SIZE 1024
-#define MAX_FILE_SIZE 1048576 // 1MB
+#define REQUEST_ID_LEN 15
 
-void clinetCommunication(char* addr, char* filename, char* hash, int* clientPorts, char* requestID);
+void clinetCommunication(char* addr, char* filename, char* hash, int* clientPorts, int numClients, char* requestID);
 
 int main(int argc, char* argv[]) {
     if (argc < 2) {
@@ -43,18 +43,26 @@ int main(int argc, char* argv[]) {
     int count;
     getConnections(output, &clientPorts, &clientAddresses, &serverAddresses, &count, listenPort);
 
+    // use current time as request ID
+    char requestID[REQUEST_ID_LEN] = {0};
+    time_t t = time(NULL);
+    struct tm tm = *localtime(&t);
+    sprintf(requestID, "%d%02d%02d%02d%02d%02d", tm.tm_year + 1900, tm.tm_mon + 1,
+        tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
+    printf("Request ID: %s\n", requestID);
+
     // for each client address
     for (int i = 0; i < count; i++) {
         // (client:port) -> (server:port)
         printf("%s:%d -> %s:%d\n", clientAddresses[i], clientPorts[i], serverAddresses[i], listenPort);
         // send hash to client
-        clinetCommunication(clientAddresses[i], filename, hash, clientPorts, "1234567890");
+        clinetCommunication(clientAddresses[i], filename, hash, clientPorts, count, requestID);
     }
 
     return 0;
 }
 
-void clinetCommunication(char* addr, char* filename, char* hash, int* clientPorts, char* requestID) {
+void clinetCommunication(char* addr, char* filename, char* hash, int* clientPorts, int numClients, char* requestID) {
     char* sendData = NULL;
     char* receiveData = NULL;
     int iResult;
@@ -164,8 +172,8 @@ void clinetCommunication(char* addr, char* filename, char* hash, int* clientPort
     printf("Received verification request from server.\n");
 
     // Send ports to server
-    char ports[100] = {0};
-    for(int i = 0; i < NUM_PORTS; i++) {
+    char ports[256] = {0};
+    for(int i = 0; i < numClients; i++) {
         char portStr[10];
         sprintf(portStr, "%d,", clientPorts[i]);
         strcat(ports, portStr);
