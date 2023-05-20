@@ -30,38 +30,38 @@ def create_response_socket(ip_version):
     return s
 
 def handle_client(conn, addr):
-    print(f"Connected by {addr}")
+    print(f'Connected by {addr}')
 
     # Step 1: Handshake
     conn.sendall(b'RemoteOpenWith Server 0.1\r\n')
     data = conn.recv(BUFFER_SIZE)
-    print("Received handshake: ", data.decode())
+    print('Received handshake:', data.decode().strip())
 
     # Step 2: Verify
     conn.sendall(b'VERIFY\r\n')
     data = conn.recv(BUFFER_SIZE)
     data = data.decode().strip()
-    print("Received verification: ", data)
+    print('Received verification:', data)
     if data != PASSWORD:
         if PASSWORD_AUTH:
             conn.sendall(b'ERROR: Password incorrect (AUTH_FAILED_PWD)\r\n')
             conn.close()
-            print("Password incorrect. Connection closed.")
+            print('Password incorrect. Connection closed.')
             return
         else:
             # do port verification
             ports = data.split(',')
-            print("Ports: ", ports)
+            print('Ports:', ports)
             if False:
                 conn.sendall(b'ERROR: No known port (AUTH_FAILED_PORT)\r\n')
                 conn.close()
-                print("Port incorrect. Connection closed.")
+                print('Port incorrect. Connection closed.')
                 return
     conn.sendall(b'OK\r\n')
 
     # Step 3: Receive file
     file_metadata_raw = conn.recv(BUFFER_SIZE)
-    print("Received file metadata: ", file_metadata_raw)
+    print('Received file metadata:', file_metadata_raw)
     try:
         file_metadata_decoded = file_metadata_raw.decode()
     except UnicodeDecodeError:
@@ -74,18 +74,19 @@ def handle_client(conn, addr):
             file_metadata_bytes[1] = 'filename failed to decode'.encode()
             file_metadata_decoded = ':'.join(file_metadata_bytes)
 
+    file_metadata_decoded = file_metadata_decoded.strip()
     file_metadata = file_metadata_decoded.split(':')
     request_id, filename, file_size, file_hash = file_metadata
     file_size = int(file_size)
-    print(f"Received file metadata: request_id={request_id}, filename={filename}, file_size={file_size}, file_hash={file_hash}")
+    print(f'Received file metadata: request_id={request_id}, filename={filename}, file_size={file_size}, file_hash={file_hash}')
     # check if `./files/request_id` exists, if so, duplicate request, reject
     if os.path.exists(os.path.join(FILE_FOLDER, request_id)):
-        print(f"Duplicate request: {request_id}, reject.")
+        print(f'Duplicate request: {request_id}, reject.')
         conn.sendall(b'ERROR: Duplicate request (DUPLICATE_REQUEST)\r\n')
         conn.close()
         return
     # check if file extension is executable for Microsoft Windows
-    if platform.system() == "Windows":
+    if platform.system() == 'Windows':
         if filename.split('.')[-1].lower() in W32_PROHIBITED_EXTENSIONS:
             print('File extenshion {} is prohibited for Microsoft Windows'.format(filename.split('.')[-1].lower()))
             conn.sendall(b'ERROR: File Rejected (W32_PROHIBITED)\r\n')
@@ -112,32 +113,41 @@ def handle_client(conn, addr):
             chunk = conn.recv(min(BUFFER_SIZE, file_size))
             f.write(chunk)
             file_size -= len(chunk)
-        print(f"Received file: {file_path}")
+        print(f'Received file: {file_path}')
     
     conn.sendall(b'OK\r\n')
 
     # Step 4: Exchange File Update Server Port
     data = conn.recv(BUFFER_SIZE)
-    print("Received File Update Server Port: ", data.decode())
+    try:
+        data = data.decode()
+    except UnicodeDecodeError:
+        data = '0'
+    
+    try:
+        file_update_server_port = int(data)
+    except ValueError:
+        file_update_server_port = 0
+    print('Received File Update Server Port:', str(file_update_server_port))
     
     # Open the file
     open_file_platform(file_path)
 
 def serve_forever(s):
-    print(f"Server is listening on {s.getsockname()}")
+    print(f'Server is listening on {s.getsockname()}')
     while True:
         conn, addr = s.accept()
         try:
             handle_client(conn, addr)
         except Exception as e:
-            print("Error: ", e)
+            print('Error: ', e)
         finally:
             conn.close()
 
 def open_file_platform(file_name):
-    if platform.system() == "Windows":
+    if platform.system() == 'Windows':
         os.startfile(file_name)
-    elif platform.system() == "Darwin":
+    elif platform.system() == 'Darwin':
         subprocess.Popen(["open", file_name])
     else:
         subprocess.Popen(["xdg-open", file_name])
@@ -149,5 +159,5 @@ def main():
     threading.Thread(target=serve_forever, args=(response_socket_v4,)).start()
     threading.Thread(target=serve_forever, args=(response_socket_v6,)).start()
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
