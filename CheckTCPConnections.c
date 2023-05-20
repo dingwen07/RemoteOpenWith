@@ -69,8 +69,8 @@ int main(int argc, char* argv[]) {
     // Cleanup
     free(output);
     free(clientPorts);
-    // freeAddresses(clientAddresses, count);
-    // freeAddresses(serverAddresses, count);
+    freeAddresses(clientAddresses, count);
+    freeAddresses(serverAddresses, count);
 
     return 0;
 }
