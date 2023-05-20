@@ -2,9 +2,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-void getConnections(char* output, int** ports, char*** clientAddresses, char*** serverAddresses, int* count, int listenPort);
-void freeAddresses(char** addresses, int count);
+#include "GetTCPConnections.h"
+
 char* executeCommand(const char* command);
+
 
 void getConnections(char* output, int** ports, char*** clientAddresses, char*** serverAddresses, int* count, int listenPort) {
     char* outputCopy = strdup(output); // Create a copy of output
