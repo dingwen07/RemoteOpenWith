@@ -55,7 +55,7 @@ void getConnections(char* output, int** ports, char*** clientAddresses, char*** 
             // printf("Found Connection: %s -> %s\n", clientAddress, serverAddress);
             // Add port to the ports array
             *ports = (int*)realloc(*ports, (*count + 1) * sizeof(int));
-            (*ports)[*count] = localPort;
+            (*ports)[*count] = peerPort;
 
             // Add client address to the clientAddresses array
             *clientAddresses = (char**)realloc(*clientAddresses, (*count + 1) * sizeof(char*));
