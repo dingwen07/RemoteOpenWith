@@ -1,0 +1,42 @@
+-- Open File Protocol
+Protocol Version: 0.1
+
+Other details: All strings are UTF-8 encoded, and all numbers are in decimal format.
+Each command, except FileData, are terminated with TELNET EOL (0x0D 0x0A).
+FileData can be arbitrary, so we cannot use TELNET EOL to terminate it.
+Instead, we use the length of the data to determine the end of the FileData.
+
+The Protocol:
+Client Connect to Server
+
+Step 1: Handshake
+Server: RemoteOpenWith Server 0.1
+Client: RemoteOpenWith 0.1
+
+Step 2: Verify
+Server: VERIFY
+Client: [Passphrase] or [list of port numbers, comma separated]
+Server: OK/Close Connection
+
+Step 3: Send file
+Client: [Request ID] FileName FileSize FileHash
+Server: OK/Close Connection
+If okay, then Client will send FileSize bytes of FileData
+Server: OK/Close Connection
+
+Step 4: Exchange File Update Server Port
+Client: [File Update Server Port]
+Close Connection
+
+-- File Update Protocol
+Client Connect to Server
+Server: RemoteOpenWith File Update Server 0.1
+Client: RemoteOpenWith Server 0.1
+Server: WHICH FILE
+Client: [Request ID]
+Server: OK/Close Connection
+Client: FileSize FileHash
+Server: OK/DATA/Close Connection
+If DATA, then Client: FileData
+Unitl Server: OK (max 3 times)
+Client/Server: Close Connection

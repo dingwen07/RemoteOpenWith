@@ -4,7 +4,6 @@
 
 #include "GetTCPConnections.h"
 
-
 void getConnections(char* output, int** ports, char*** clientAddresses, char*** serverAddresses, int* count, int listenPort) {
     char* outputCopy = strdup(output); // Create a copy of output
     char* line;
@@ -74,10 +73,42 @@ void getConnections(char* output, int** ports, char*** clientAddresses, char*** 
     }
 }
 
-
 void freeAddresses(char** addresses, int count) {
     for (int i = 0; i < count; i++) {
         free(addresses[i]);
     }
     free(addresses);
+}
+
+char* executeCommand(const char* command) {
+    FILE* fp;
+    char buffer[128];
+    char* output = NULL;
+    size_t outputSize = 0;
+
+    fp = _popen(command, "r");
+    if (fp == NULL) {
+        perror("Failed to execute command");
+        return NULL;
+    }
+
+    while (fgets(buffer, sizeof(buffer), fp) != NULL) {
+        size_t bufferLen = strlen(buffer);
+        output = realloc(output, outputSize + bufferLen + 1);
+        if (output == NULL) {
+            perror("Failed to allocate memory");
+            break;
+        }
+        strcpy(output + outputSize, buffer);
+        outputSize += bufferLen;
+    }
+
+    _pclose(fp);
+
+    return output;
+}
+
+char* getTCPNetStat() {
+    char* command = "netstat -ano | findstr TCP | findstr ESTABLISHED";
+    return executeCommand(command);
 }

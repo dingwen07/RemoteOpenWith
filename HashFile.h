@@ -1,0 +1,1 @@
+char* hashFile(char* filename);

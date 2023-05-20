@@ -6,37 +6,6 @@
 
 #define DEFAULT_PORT 443
 
-char* executeCommand(const char* command);
-
-
-char* executeCommand(const char* command) {
-    FILE* fp;
-    char buffer[128];
-    char* output = NULL;
-    size_t outputSize = 0;
-
-    fp = _popen(command, "r");
-    if (fp == NULL) {
-        perror("Failed to execute command");
-        return NULL;
-    }
-
-    while (fgets(buffer, sizeof(buffer), fp) != NULL) {
-        size_t bufferLen = strlen(buffer);
-        output = realloc(output, outputSize + bufferLen + 1);
-        if (output == NULL) {
-            perror("Failed to allocate memory");
-            break;
-        }
-        strcpy(output + outputSize, buffer);
-        outputSize += bufferLen;
-    }
-
-    _pclose(fp);
-
-    return output;
-}
-
 
 int main(int argc, char* argv[]) {
     // Get the port to listen on from the command line
