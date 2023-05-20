@@ -1,6 +1,8 @@
 import socket
 import os
 import threading
+import platform
+import subprocess
 
 SERVER_IP_V4 = "0.0.0.0"
 SERVER_IP_V6 = "::"
@@ -74,8 +76,8 @@ def handle_client(conn, addr):
     data = conn.recv(BUFFER_SIZE)
     print("Received File Update Server Port: ", data.decode())
     
-    # Open the file using OS GUI desktop environment
-    os.startfile(file_path)
+    # Open the file
+    open_file_platform(file_path)
 
 def serve_forever(s):
     print(f"Server is listening on {s.getsockname()}")
@@ -87,6 +89,14 @@ def serve_forever(s):
             print("Error: ", e)
         finally:
             conn.close()
+
+def open_file_platform(file_name):
+    if platform.system() == "Windows":
+        os.startfile(file_name)
+    elif platform.system() == "Darwin":
+        subprocess.Popen(["open", file_name])
+    else:
+        subprocess.Popen(["xdg-open", file_name])
 
 def main():
     response_socket_v4 = create_response_socket(4)
