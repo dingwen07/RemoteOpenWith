@@ -4,8 +4,6 @@
 
 #include "GetTCPConnections.h"
 
-char* executeCommand(const char* command);
-
 
 void getConnections(char* output, int** ports, char*** clientAddresses, char*** serverAddresses, int* count, int listenPort) {
     char* outputCopy = strdup(output); // Create a copy of output
@@ -82,66 +80,4 @@ void freeAddresses(char** addresses, int count) {
         free(addresses[i]);
     }
     free(addresses);
-}
-
-
-char* executeCommand(const char* command) {
-    FILE* fp;
-    char buffer[128];
-    char* output = NULL;
-    size_t outputSize = 0;
-
-    fp = _popen(command, "r");
-    if (fp == NULL) {
-        perror("Failed to execute command");
-        return NULL;
-    }
-
-    while (fgets(buffer, sizeof(buffer), fp) != NULL) {
-        size_t bufferLen = strlen(buffer);
-        output = realloc(output, outputSize + bufferLen + 1);
-        if (output == NULL) {
-            perror("Failed to allocate memory");
-            break;
-        }
-        strcpy(output + outputSize, buffer);
-        outputSize += bufferLen;
-    }
-
-    _pclose(fp);
-
-    return output;
-}
-
-
-int main() {
-    // Execute the command and capture the output
-    char* command = "netstat -ano | findstr TCP | findstr ESTABLISHED";
-    char* output = executeCommand(command);
-
-    // Print the raw output for debugging
-    printf("Command Output:\n%s\n", output);
-
-    // get connections
-    int* clientPorts;
-    char** clientAddresses;
-    char** serverAddresses;
-    int count;
-    int listenPort = 443; // Change to the desired listen port
-    getConnections(output, &clientPorts, &clientAddresses, &serverAddresses, &count, listenPort);
-
-    // Print connection info
-    printf("Connections:\n");
-    for (int i = 0; i < count; i++) {
-        // (client:port) -> (server:port)
-        printf("%s:%d -> %s:%d\n", clientAddresses[i], clientPorts[i], serverAddresses[i], listenPort);
-    }
-
-    // Cleanup
-    free(output);
-    free(clientPorts);
-    // freeAddresses(clientAddresses, count);
-    // freeAddresses(serverAddresses, count);
-
-    return 0;
 }
