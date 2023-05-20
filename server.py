@@ -1,5 +1,6 @@
 import socket
 import os
+import sys
 import threading
 import platform
 import subprocess
@@ -11,6 +12,8 @@ BUFFER_SIZE = 1024
 FILE_FOLDER = './files'
 PASSWORD_AUTH = False
 PASSWORD = 'VerySecurePassword'
+W32_PROHIBITED_EXTENSIONS = ['exe', 'bat', 'cmd', 'com', 'msi', 'ps1', 'scr', 'vbs']
+W32_PROHIBITED_EXTENSIONS += ['lnk', 'py', 'pyw']
 
 def create_response_socket(ip_version):
     if ip_version == 4:
@@ -41,7 +44,7 @@ def handle_client(conn, addr):
     print("Received verification: ", data)
     if data != PASSWORD:
         if PASSWORD_AUTH:
-            conn.sendall(b'ERROR\r\n')
+            conn.sendall(b'ERROR: Password incorrect (AUTH_FAILED_PWD)\r\n')
             conn.close()
             print("Password incorrect. Connection closed.")
             return
@@ -49,7 +52,11 @@ def handle_client(conn, addr):
             # do port verification
             ports = data.split(',')
             print("Ports: ", ports)
-            
+            if False:
+                conn.sendall(b'ERROR: No known port (AUTH_FAILED_PORT)\r\n')
+                conn.close()
+                print("Port incorrect. Connection closed.")
+                return
     conn.sendall(b'OK\r\n')
 
     # Step 3: Receive file
@@ -74,9 +81,26 @@ def handle_client(conn, addr):
     # check if `./files/request_id` exists, if so, duplicate request, reject
     if os.path.exists(os.path.join(FILE_FOLDER, request_id)):
         print(f"Duplicate request: {request_id}, reject.")
-        conn.sendall(b'ERROR: Duplicate request\r\n')
+        conn.sendall(b'ERROR: Duplicate request (DUPLICATE_REQUEST)\r\n')
         conn.close()
         return
+    # check if file extension is executable for Microsoft Windows
+    if platform.system() == "Windows":
+        if filename.split('.')[-1].lower() in W32_PROHIBITED_EXTENSIONS:
+            print('File extenshion {} is prohibited for Microsoft Windows'.format(filename.split('.')[-1].lower()))
+            conn.sendall(b'ERROR: File Rejected (W32_PROHIBITED)\r\n')
+            conn.close()
+            return
+    # else for POSIX
+    elif sys.platform == 'posix':
+        # remove executable permission for POSIX
+        # get current file permission
+        file_permission = os.stat(filename).st_mode
+        # remove executable permission
+        file_permission = file_permission & ~stat.S_IXUSR
+        # set new file permission
+        os.chmod(filename, file_permission)
+
     conn.sendall(b'OK\r\n')
 
     folder_path = os.path.join(FILE_FOLDER, request_id)
