@@ -2,19 +2,19 @@
 #include <stdlib.h>
 #include <string.h>
 
-void getClientPorts(char* output, int** ports, int* count, int listenPort);
-void getServerAddresses(char* output, char*** addresses, int* count, int listenPort);
-void removeDuplicateAddresses(char*** addresses, int* count);
-void removeDuplicatePorts(int** ports, int* count);
+void getConnections(char* output, int** ports, char*** clientAddresses, char*** serverAddresses, int* count, int listenPort);
+void freeAddresses(char** addresses, int count);
 char* executeCommand(const char* command);
 
-void getClientPorts(char* output, int** ports, int* count, int listenPort) {
+void getConnections(char* output, int** ports, char*** clientAddresses, char*** serverAddresses, int* count, int listenPort) {
     char* outputCopy = strdup(output); // Create a copy of output
     char* line;
     char* saveLine;
     line = strtok_s(outputCopy, "\n", &saveLine);
 
     *ports = (int*)malloc(0);
+    *clientAddresses = (char**)malloc(0);
+    *serverAddresses = (char**)malloc(0);
     *count = 0;
 
     while (line) {
@@ -32,143 +32,55 @@ void getClientPorts(char* output, int** ports, int* count, int listenPort) {
         int localPort = atoi(localPortStr);
         int remotePort = atoi(remotePortStr);
 
+        int found = 0;
+        int peerPort = -1;
+        char* clientAddress = NULL;
+        char* serverAddress = NULL;
+
         if (localPort == listenPort) {
-            *ports = (int*)realloc(*ports, (*count + 1) * sizeof(int));
-            (*ports)[*count] = remotePort;
-            (*count)++;
+            peerPort = remotePort;
+            clientAddress = remoteAddr;
+            serverAddress = localAddr;
+
+            found = 1;
         }
         else if (remotePort == listenPort) {
+            peerPort = localPort;
+            clientAddress = localAddr;
+            serverAddress = remoteAddr;
+            
+            found = 1;
+        }
+
+        if (found) {
+            // printf("Found Connection: %s -> %s\n", clientAddress, serverAddress);
+            // Add port to the ports array
             *ports = (int*)realloc(*ports, (*count + 1) * sizeof(int));
             (*ports)[*count] = localPort;
+
+            // Add client address to the clientAddresses array
+            *clientAddresses = (char**)realloc(*clientAddresses, (*count + 1) * sizeof(char*));
+            *strrchr(clientAddress, ':') = '\0'; // NULL-terminate the address at the colon
+            (*clientAddresses)[*count] = strdup(clientAddress);
+
+            // Add server address to the serverAddresses array
+            *serverAddresses = (char**)realloc(*serverAddresses, (*count + 1) * sizeof(char*));
+            *strrchr(serverAddress, ':') = '\0'; // NULL-terminate the address at the colon
+            (*serverAddresses)[*count] = strdup(serverAddress);
+
             (*count)++;
         }
 
         line = strtok_s(NULL, "\n", &saveLine);
     }
-
-    // Remove duplicates from the ports array
-    removeDuplicatePorts(ports, count);
 }
 
 
-void getServerAddresses(char* output, char*** addresses, int* count, int listenPort) {
-    char* outputCopy = strdup(output); // Create a copy of output
-    char* line;
-    char* saveLine;
-    line = strtok_s(outputCopy, "\n", &saveLine);
-
-    *addresses = (char**)malloc(0);
-    *count = 0;
-
-    while (line != NULL) {
-        char protocol[10];
-        char localAddr[80];
-        char remoteAddr[80];
-        char status[20];
-        int pid;
-
-        sscanf(line, "%s %[^ ] %[^ ] %s %d", protocol, localAddr, remoteAddr, status, &pid);
-
-        char* localPortStr = strrchr(localAddr, ':') + 1;
-        char* remotePortStr = strrchr(remoteAddr, ':') + 1;
-
-        int localPort = atoi(localPortStr);
-        int remotePort = atoi(remotePortStr);
-        // printf("Local Port: %d\n", localPort);
-        // printf("Remote Port: %d\n", remotePort);
-
-        if (localPort == listenPort) {
-            *addresses = (char**)realloc(*addresses, (*count + 1) * sizeof(char*));
-            *strrchr(localAddr, ':') = '\0'; // NULL-terminate the address at the colon
-            (*addresses)[*count] = strdup(localAddr);
-            (*count)++;
-        }
-        else if (remotePort == listenPort) {
-            *addresses = (char**)realloc(*addresses, (*count + 1) * sizeof(char*));
-            *strrchr(remoteAddr, ':') = '\0'; // NULL-terminate the address at the colon
-            (*addresses)[*count] = strdup(remoteAddr);
-            (*count)++;
-        }
-
-        line = strtok_s(NULL, "\n", &saveLine);
+void freeAddresses(char** addresses, int count) {
+    for (int i = 0; i < count; i++) {
+        free(addresses[i]);
     }
-
-    // Remove duplicates from the addresses array
-    removeDuplicateAddresses(addresses, count);
-}
-
-
-void removeDuplicateAddresses(char*** addresses, int* count) {
-    if (*count <= 1) {
-        return; // No duplicates to remove
-    }
-
-    char** uniqueAddresses = (char**)malloc(*count * sizeof(char*));
-    int uniqueCount = 0;
-
-    // Iterate over the addresses and add only unique ones to the new array
-    for (int i = 0; i < *count; i++) {
-        int isDuplicate = 0;
-
-        // Check if the current address is already in the uniqueAddresses array
-        for (int j = 0; j < uniqueCount; j++) {
-            if (strcmp((*addresses)[i], uniqueAddresses[j]) == 0) {
-                isDuplicate = 1;
-                break;
-            }
-        }
-
-        if (!isDuplicate) {
-            uniqueAddresses[uniqueCount] = strdup((*addresses)[i]);
-            uniqueCount++;
-        }
-    }
-
-    // Free the original addresses
-    for (int i = 0; i < *count; i++) {
-        free((*addresses)[i]);
-    }
-    free(*addresses);
-
-    // Update the addresses and count with the unique ones
-    *addresses = uniqueAddresses;
-    *count = uniqueCount;
-}
-
-
-
-void removeDuplicatePorts(int** ports, int* count) {
-    if (*count <= 1) {
-        return; // No duplicates to remove
-    }
-
-    int* uniquePorts = (int*)malloc(*count * sizeof(int));
-    int uniqueCount = 0;
-
-    // Iterate over the ports and add only unique ones to the new array
-    for (int i = 0; i < *count; i++) {
-        int isDuplicate = 0;
-
-        // Check if the current port is already in the uniquePorts array
-        for (int j = 0; j < uniqueCount; j++) {
-            if ((*ports)[i] == uniquePorts[j]) {
-                isDuplicate = 1;
-                break;
-            }
-        }
-
-        if (!isDuplicate) {
-            uniquePorts[uniqueCount] = (*ports)[i];
-            uniqueCount++;
-        }
-    }
-
-    // Free the original ports array
-    free(*ports);
-
-    // Update the ports and count with the unique ones
-    *ports = uniquePorts;
-    *count = uniqueCount;
+    free(addresses);
 }
 
 
@@ -209,36 +121,26 @@ int main() {
     // Print the raw output for debugging
     printf("Command Output:\n%s\n", output);
 
-    // Parse TCP ports of the client
+    // get connections
     int* clientPorts;
-    int clientCount;
-    int listenPort = 3389; // Change to the desired listen port
-    getClientPorts(output, &clientPorts, &clientCount, listenPort);
-
-    // Print TCP ports of the client
-    printf("\nClient TCP Ports:\n");
-    for (int i = 0; i < clientCount; i++) {
-        printf("%d\n", clientPorts[i]);
-    }
-
-    // Parse IP addresses of the server
+    char** clientAddresses;
     char** serverAddresses;
-    int serverCount;
-    getServerAddresses(output, &serverAddresses, &serverCount, listenPort);
+    int count;
+    int listenPort = 443; // Change to the desired listen port
+    getConnections(output, &clientPorts, &clientAddresses, &serverAddresses, &count, listenPort);
 
-    // Print IP addresses of servers
-    printf("\nServer IP Addresses:\n");
-    for (int i = 0; i < serverCount; i++) {
-        printf("%s\n", serverAddresses[i]);
+    // Print connection info
+    printf("Connections:\n");
+    for (int i = 0; i < count; i++) {
+        // (client:port) -> (server:port)
+        printf("%s:%d -> %s:%d\n", clientAddresses[i], clientPorts[i], serverAddresses[i], listenPort);
     }
 
     // Cleanup
     free(output);
     free(clientPorts);
-    for (int i = 0; i < serverCount; i++) {
-        free(serverAddresses[i]);
-    }
-    free(serverAddresses);
+    // freeAddresses(clientAddresses, count);
+    // freeAddresses(serverAddresses, count);
 
     return 0;
 }
